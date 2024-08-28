@@ -327,7 +327,9 @@ impl Memory {
         // TODO: should we align the memory?
         let _alignment = alignment.max(mem::align_of::<Header>());
 
+        let len = mmap.len();
         let ptr = mmap.as_mut_ptr();
+        let mmap_slice = slice::from_raw_parts_mut(ptr, len);
 
         let header_ptr_offset = ptr.add(1).align_offset(mem::align_of::<Header>()) + 1;
         let data_offset = header_ptr_offset + mem::size_of::<Header>();
@@ -352,9 +354,9 @@ impl Memory {
           ptr::write_bytes(
             ptr.add(allocated as usize),
             0,
-            mmap.len() - allocated as usize,
+            mmap_slice.len() - allocated as usize,
           );
-          Self::sanity_check(Some(freelist), magic_version, &mmap)?;
+          Self::sanity_check(Some(freelist), magic_version, &mmap_slice)?;
           (CURRENT_VERSION, magic_version)
         };
 
@@ -487,11 +489,12 @@ impl Memory {
 
       // TODO:  should we align the memory?
       let _alignment = alignment.max(mem::align_of::<Header>());
+      let len = mmap.len();
       let ptr = mmap.as_mut_ptr();
 
       // Safety: we have add the overhead for the header
       unsafe {
-        ptr::write_bytes(ptr, 0, mmap.len());
+        ptr::write_bytes(ptr, 0, len);
 
         let header_ptr_offset = ptr.add(1).align_offset(mem::align_of::<Header>()) + 1;
         let mut data_offset = header_ptr_offset + mem::size_of::<Header>();
@@ -513,7 +516,7 @@ impl Memory {
         };
 
         let this = Self {
-          cap: mmap.len() as u32,
+          cap: len as u32,
           backend: MemoryBackend::AnonymousMmap { buf: mmap },
           refs: AtomicUsize::new(1),
           data_offset,
